@@ -1,0 +1,9 @@
+[project]
+name = "cli-proxy-quota"
+version = "0.1.0"
+description = "A compact CLIProxyAPI quota widget and local usage dashboard"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.uv]
+package = false

@@ -4,3 +4,11 @@ __pycache__/
 .env
 *.sqlite*
 .local/
+
+# Local design workspace; publish only sanitized screenshots.
+*.pen
+design-previews/
+prototype/
+DESIGN.md
+RESEARCH.md
+WIDGET_DESIGN.md
