@@ -28,7 +28,7 @@ Screenshots use synthetic demo accounts and usage, not private account data.
 Requires Python 3.10+, GTK 3, PyGObject, Cairo and Ayatana AppIndicator. On Ubuntu 24.04:
 
 ```bash
-sudo apt install git python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1
+sudo apt install git python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 librsvg2-common
 git clone https://github.com/Changroro/CLIProxy-quota.git
 cd CLIProxy-quota
 ```
