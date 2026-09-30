@@ -1,5 +1,6 @@
 import argparse
 import sys
+import traceback
 from pathlib import Path
 from unittest.mock import patch
 
@@ -38,6 +39,7 @@ with patch.object(widget, "load_reports", return_value=(reports, [])), patch.obj
     window = widget.QuotaWindow(lambda _: None)
     window.show_all()
     window.move(20, 20)
+    exit_code = 0
     def capture(theme):
         width, height = window.get_size()
         assert width == 260, (width, height)
@@ -49,11 +51,28 @@ with patch.object(widget, "load_reports", return_value=(reports, [])), patch.obj
                 save_language.assert_called_once_with(args.language)
                 restart.assert_called_once()
             window.theme_items["dark"].set_active(True)
-            GLib.timeout_add(500, capture, "dark")
+            GLib.timeout_add(500, checked_capture, "dark")
         else:
             Gtk.main_quit()
         return False
-    GLib.timeout_add(800, capture, "light")
+    def checked_capture(theme):
+        global exit_code
+        try:
+            return capture(theme)
+        except Exception:
+            traceback.print_exc()
+            exit_code = 1
+            Gtk.main_quit()
+            return False
+    def deadline():
+        global exit_code
+        print("GTK preview did not finish within 15 seconds", file=sys.stderr)
+        exit_code = 1
+        Gtk.main_quit()
+        return False
+    GLib.timeout_add(800, checked_capture, "light")
+    GLib.timeout_add_seconds(15, deadline)
     Gtk.main()
     window.destroyed = True
     window.destroy()
+    raise SystemExit(exit_code)

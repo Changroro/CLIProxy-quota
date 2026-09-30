@@ -148,7 +148,7 @@ class QuotaBar(Gtk.DrawingArea):
         super().__init__()
         self.remaining = max(0, min(100, remaining))
         self.color = color
-        self.set_size_request(96, 5)
+        self.set_size_request(72, 5)
         self.set_valign(Gtk.Align.CENTER)
         self.get_accessible().set_name(t("잔여량 {v0:g}%", v0=self.remaining))
         self.connect("draw", self.draw_bar)

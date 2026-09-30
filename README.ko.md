@@ -28,7 +28,7 @@ CLIProxyAPI 공식 클라이언트가 아닌 독립 프로젝트입니다.
 Python 3.10 이상, GTK 3, PyGObject, Cairo, Ayatana AppIndicator가 필요합니다. Ubuntu 24.04 기준:
 
 ```bash
-sudo apt install git python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 librsvg2-common
+sudo apt install git python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 librsvg2-common fonts-noto-cjk
 git clone https://github.com/Changroro/CLIProxy-quota.git
 cd CLIProxy-quota
 ```
