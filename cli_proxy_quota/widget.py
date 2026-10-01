@@ -192,9 +192,8 @@ class QuotaBar(Gtk.DrawingArea):
 
 
 class QuotaWindow(Gtk.Window):
-    def __init__(self, reports_updated):
+    def __init__(self):
         super().__init__(title=t("CLIProxy 사용량"))
-        self.reports_updated = reports_updated
         self.reports = []
         self.provider_errors = []
         self.account_expanded = {}
@@ -515,7 +514,6 @@ class QuotaWindow(Gtk.Window):
             self.updated_label.set_text(f"{query_clock:%H:%M}")
             self.updated_label.set_tooltip_text(None)
             self.show_notice("")
-        self.reports_updated(reports)
         return False
 
     def render_cards(self):
@@ -836,12 +834,11 @@ class UsageApplication(Gtk.Application):
             flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
         )
         self.window = None
-        self.summary_items = {}
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
         self.hold()
-        self.window = QuotaWindow(self.update_summaries)
+        self.window = QuotaWindow()
         self.window.set_application(self)
         self.indicator = AyatanaAppIndicator3.Indicator.new(
             "cli-proxy-quota",
@@ -851,22 +848,12 @@ class UsageApplication(Gtk.Application):
         self.indicator.set_status(AyatanaAppIndicator3.IndicatorStatus.ACTIVE)
         self.indicator.set_title(t("CLIProxy 사용량"))
         menu = Gtk.Menu()
-        open_item = Gtk.MenuItem(label=t("사용량 열기"))
+        open_item = Gtk.MenuItem(label=t("위젯 열기"))
         open_item.connect("activate", lambda _item: self.show_window())
         menu.append(open_item)
-        menu.append(Gtk.SeparatorMenuItem())
-        self.menu = menu
-        self.summary_end = Gtk.SeparatorMenuItem()
-        menu.append(self.summary_end)
-        refresh_item = Gtk.MenuItem(label=t("지금 새로고침"))
-        refresh_item.connect("activate", lambda _item: self.window.refresh())
-        menu.append(refresh_item)
-        reset_item = Gtk.MenuItem(label=t("쿨다운 리셋"))
-        reset_item.connect("activate", lambda _item: self.window.reset_cooldown())
-        menu.append(reset_item)
-        quit_item = Gtk.MenuItem(label=t("종료"))
-        quit_item.connect("activate", lambda _item: self.stop())
-        menu.append(quit_item)
+        dashboard_item = Gtk.MenuItem(label=t("대시보드 열기"))
+        dashboard_item.connect("activate", self.window.open_dashboard)
+        menu.append(dashboard_item)
         menu.show_all()
         self.indicator.set_menu(menu)
 
@@ -879,32 +866,6 @@ class UsageApplication(Gtk.Application):
     def show_window(self):
         self.window.show_all()
         self.window.present()
-
-    def update_summaries(self, reports):
-        grouped_reports = {}
-        for report in reports:
-            provider = report.get("provider")
-            grouped_reports.setdefault(provider, []).append(report)
-        for item in self.summary_items.values():
-            self.menu.remove(item)
-        self.summary_items = {}
-        position = self.menu.get_children().index(self.summary_end)
-        for provider, provider_reports in grouped_reports.items():
-            available = sum(report.get("status") not in ("exhausted", "error") for report in provider_reports)
-            label = PROVIDER_LABELS.get(provider, provider.title())
-            item = Gtk.MenuItem(label=t("{v0} {v1}/{v2} 사용 가능", v0=label, v1=available, v2=len(provider_reports)))
-            item.set_sensitive(False)
-            self.menu.insert(item, position)
-            item.show()
-            self.summary_items[provider] = item
-            position += 1
-
-    def stop(self):
-        self.window.destroyed = True
-        self.window.destroy()
-        self.release()
-        self.quit()
-
 
 def main():
     settings = configuration.load_settings()

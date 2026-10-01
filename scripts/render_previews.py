@@ -36,7 +36,7 @@ for index, (provider, plan, remaining) in enumerate([
 settings = {"base_url": "http://127.0.0.1:8317", "management_key": "demo-only",
             "theme": "light", "language": args.language, "dashboard_url": None}
 with patch.object(widget, "load_reports", return_value=(reports, [])), patch.object(widget, "load_aliases", return_value={}), patch.object(widget.configuration, "load_settings", return_value=settings), patch.object(widget.configuration, "save_theme"):
-    window = widget.QuotaWindow(lambda _: None)
+    window = widget.QuotaWindow()
     window.show_all()
     window.move(20, 20)
     exit_code = 0
