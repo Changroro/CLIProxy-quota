@@ -2,6 +2,7 @@ from .i18n import t
 import json
 import os
 import tempfile
+import fcntl
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -55,17 +56,30 @@ def save_settings(settings):
         temporary.unlink(missing_ok=True)
 
 
+def management_url():
+    return load_settings()["base_url"] + "/management.html?theme=cli-proxy-quota&v=usage"
+
+
 def save_theme(theme):
     if theme not in ("system", "light", "dark"):
         raise ValueError(t("알 수 없는 테마입니다."))
-    settings = stored_settings()
-    settings["theme"] = theme
-    save_settings(settings)
+    set_option("theme", theme)
 
 
 def save_language(language):
     if language not in ("system", "en", "ko"):
         raise ValueError(t("language는 system, en, ko 중 하나여야 합니다."))
-    settings = stored_settings()
-    settings["language"] = language
-    save_settings(settings)
+    set_option("language", language)
+
+
+def set_option(name, value):
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with open(CONFIG_DIR / "settings.lock", "a+") as lock:
+        os.chmod(lock.name, 0o600)
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        settings = stored_settings()
+        if value is None:
+            settings.pop(name, None)
+        else:
+            settings[name] = value
+        save_settings(settings)

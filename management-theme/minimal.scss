@@ -1,0 +1,107 @@
+:root,
+:root[data-theme='white'] {
+  --bg-secondary: #ffffff;
+  --bg-primary: #f8f8f9;
+  --bg-tertiary: #f3f3f5;
+  --bg-hover: #ededf0;
+  --bg-quinary: #ffffff;
+  --floating-surface: #ffffff;
+  --text-primary: #27272a;
+  --text-secondary: #64646c;
+  --text-tertiary: #73737a;
+  --text-quaternary: #85858c;
+  --border-color: #e4e4e7;
+  --border-primary: #d4d4d8;
+  --border-hover: #bcbcc4;
+  --primary-color: #27272a;
+  --primary-hover: #3f3f46;
+  --primary-active: #18181b;
+  --primary-contrast: #ffffff;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg-secondary: #1c1c1e;
+  --bg-primary: #242426;
+  --bg-tertiary: #2c2c2f;
+  --bg-hover: #323236;
+  --bg-quinary: #1c1c1e;
+  --floating-surface: #242426;
+  --text-primary: #eeeef0;
+  --text-secondary: #b0b0b5;
+  --text-tertiary: #a1a1aa;
+  --text-quaternary: #92929b;
+  --border-color: #363639;
+  --border-primary: #45454a;
+  --border-hover: #66666f;
+  --primary-color: #eeeef0;
+  --primary-hover: #d4d4d8;
+  --primary-active: #ffffff;
+  --primary-contrast: #1c1c1e;
+  color-scheme: dark;
+}
+
+:root,
+:root[data-theme='white'],
+:root[data-theme='dark'] {
+  --success-color: #22c55e;
+  --quota-medium-color: #facc15;
+  --error-color: #ef4444;
+  --warning-color: #ef4444;
+  --viz-success: #22c55e;
+  --viz-failure: #ef4444;
+  --amber-color: #facc15;
+  --amber-text: var(--text-primary);
+  --shadow: none;
+  --shadow-lg: 0 8px 24px rgb(0 0 0 / 0.12);
+  --floating-shadow: var(--shadow-lg);
+  --glass-backdrop-filter: none;
+  --glass-filter: none;
+  --glass-bg: var(--bg-primary);
+  --glass-bg-secondary: var(--bg-secondary);
+  --glass-border: var(--border-color);
+  --header-height: 72px;
+  --shell-gutter: 24px;
+  --sidebar-panel-width: 208px;
+}
+
+body {
+  font-family: Inter, 'Noto Sans', system-ui, -apple-system, sans-serif;
+}
+
+.top-gradient-blur { display: none; }
+.sidebar {
+  background: var(--bg-primary);
+  border-right: 1px solid var(--border-color);
+}
+.main-header .header-actions,
+.main-header .mobile-sidebar-actions,
+.main-header .sidebar-toggle-floating {
+  background: var(--bg-secondary);
+  box-shadow: none;
+  border-radius: 6px;
+  border-color: var(--border-color);
+}
+.main-header .language-menu-popover,
+.main-header .theme-menu-popover {
+  background: var(--floating-surface);
+  box-shadow: var(--floating-shadow);
+  border-color: var(--border-color);
+}
+.sidebar .nav-item {
+  border-radius: 6px;
+  font-weight: 500;
+  min-height: 36px;
+}
+.sidebar .nav-item.active {
+  background: var(--bg-secondary);
+  box-shadow: none;
+  border-color: var(--border-color);
+}
+.sidebar .sidebar-brand-title { font-weight: 600; }
+.btn { border-radius: 6px; box-shadow: none; }
+
+@media (max-width: 768px) {
+  :root { --shell-gutter: 16px; --floating-control-size: 44px; }
+  .sidebar .nav-item { min-height: 44px; }
+}

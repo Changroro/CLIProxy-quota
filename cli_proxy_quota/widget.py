@@ -4,6 +4,8 @@ import os
 import sys
 import tempfile
 import threading
+import urllib.request
+from urllib.parse import parse_qs, urlsplit
 from datetime import datetime
 from pathlib import Path
 
@@ -86,6 +88,28 @@ def theme_css(theme):
 
 
 def load_reports():
+    dashboard_url = configuration.load_settings()["dashboard_url"]
+    if dashboard_url:
+        parsed = urlsplit(dashboard_url)
+        token = parse_qs(parsed.fragment).get("token", [None])[0]
+        if token:
+            if parsed.hostname not in ("127.0.0.1", "localhost") or parsed.scheme != "http":
+                raise ValueError(t("대시보드 주소가 올바르지 않습니다."))
+            request = urllib.request.Request(f"http://{parsed.netloc}/api/accounts", headers={"Authorization": f"Bearer {token}", "X-Quota-Client": "1"})
+            with urllib.request.urlopen(request, timeout=10) as response:
+                snapshot = json.load(response)
+            if snapshot["status"]["quota_error"]:
+                raise RuntimeError(snapshot["status"]["quota_error"])
+            if snapshot["status"]["quota_updated_at"] is None:
+                raise RuntimeError(t("계정 정보를 조회하고 있습니다."))
+            for report in snapshot["reports"]:
+                report["quota_observed_at"] = snapshot["status"]["quota_updated_at"]
+                for window in report["windows"]:
+                    event = window.get("last_reset_event")
+                    window["last_reset_label"] = client.format_event(event) if isinstance(event, dict) else t("초기화 관측 없음")
+                    if window.get("reset_at") is None:
+                        window["reset_label"] = t("API 미제공")
+            return snapshot["reports"], snapshot["errors"]
     return client.collect_reports()
 
 
@@ -220,9 +244,7 @@ class QuotaWindow(Gtk.Window):
         header.pack_start(self.updated_label, True, True, 0)
         self.dashboard_button = Gtk.Button.new_from_icon_name("view-grid-symbolic", Gtk.IconSize.MENU)
         self.dashboard_button.get_style_context().add_class("compact-button")
-        self.dashboard_button.set_tooltip_text(t("대시보드 열기") if self.settings["dashboard_url"] else t("대시보드 연결 후 사용할 수 있습니다"))
-        self.dashboard_button.set_sensitive(self.settings["dashboard_url"] is not None)
-        self.dashboard_button.set_no_show_all(self.settings["dashboard_url"] is None)
+        self.dashboard_button.set_tooltip_text(t("대시보드 열기"))
         self.dashboard_button.connect("clicked", self.open_dashboard)
         self.refresh_button = Gtk.Button.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.MENU)
         self.refresh_button.set_tooltip_text(t("지금 새로고침"))
@@ -334,8 +356,7 @@ class QuotaWindow(Gtk.Window):
             self.apply_theme()
 
     def open_dashboard(self, _button):
-        if self.settings["dashboard_url"]:
-            Gio.AppInfo.launch_default_for_uri(self.settings["dashboard_url"], None)
+        Gio.AppInfo.launch_default_for_uri(configuration.management_url(), None)
 
     def choose_language(self, item, choice):
         if item.get_active():
@@ -381,7 +402,7 @@ class QuotaWindow(Gtk.Window):
             self.cancel_order_button.hide()
             self.save_order_button.hide()
         for control in (self.updated_label, self.dashboard_button, self.refresh_button, self.menu_button):
-            hidden = self.order_editing or (control is self.dashboard_button and self.settings["dashboard_url"] is None)
+            hidden = self.order_editing
             control.set_no_show_all(hidden)
             control.set_visible(not hidden)
         self.render_cards()
@@ -456,6 +477,9 @@ class QuotaWindow(Gtk.Window):
         if self.destroyed:
             return False
         self.refreshing = False
+        self.settings["dashboard_url"] = configuration.load_settings()["dashboard_url"]
+        self.dashboard_button.set_no_show_all(self.order_editing)
+        self.dashboard_button.set_visible(not self.order_editing)
         self.refresh_button.set_sensitive(True)
         self.save_order_button.set_sensitive(True)
         if error is not None:
@@ -463,6 +487,8 @@ class QuotaWindow(Gtk.Window):
             self.show_notice(t("서버 연결 실패"), str(error))
             return False
         reports, provider_errors = result
+        observed = max((report.get("quota_observed_at", 0) for report in reports), default=0)
+        query_clock = datetime.fromtimestamp(observed) if observed else datetime.now()
         previous_reports = self.reports
         previous_errors = self.provider_errors
         self.reports = reports
@@ -477,7 +503,7 @@ class QuotaWindow(Gtk.Window):
             self.show_notice(t("사용량 표시 실패"), str(render_error))
             return False
         if provider_errors:
-            self.updated_label.set_text(f"{datetime.now():%H:%M}")
+            self.updated_label.set_text(f"{query_clock:%H:%M}")
             self.show_notice(provider_failure_summary(provider_errors))
             details = "\n".join(
                 f"{PROVIDER_LABELS.get(error['provider'], error['provider'].title())}: {error['message']}"
@@ -486,7 +512,7 @@ class QuotaWindow(Gtk.Window):
             self.updated_label.set_tooltip_text(details)
             self.notice_label.set_tooltip_text(details)
         else:
-            self.updated_label.set_text(f"{datetime.now():%H:%M}")
+            self.updated_label.set_text(f"{query_clock:%H:%M}")
             self.updated_label.set_tooltip_text(None)
             self.show_notice("")
         self.reports_updated(reports)

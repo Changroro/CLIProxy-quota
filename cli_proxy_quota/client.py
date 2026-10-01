@@ -335,6 +335,7 @@ def apply_reset_history(reports, state, observed_at):
             for window in report.get("windows", []):
                 record = windows_state.get(f"{provider}:{account_id}:{window.get('id')}", {})
                 event = record.get("last_reset")
+                window["last_reset_event"] = event if isinstance(event, dict) else None
                 window["last_reset_label"] = format_event(event) if isinstance(event, dict) else t("초기화 관측 없음")
             continue
         for window in report.get("windows", []):
@@ -378,6 +379,7 @@ def apply_reset_history(reports, state, observed_at):
                 "cycle_id": window.get("cycle_id"),
             }
             event = record.get("last_reset")
+            window["last_reset_event"] = event if isinstance(event, dict) else None
             window["last_reset_label"] = format_event(event) if isinstance(event, dict) else t("초기화 관측 없음")
 
 

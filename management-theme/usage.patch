@@ -1,0 +1,243 @@
+diff --git a/src/components/layout/MainLayout.tsx b/src/components/layout/MainLayout.tsx
+index b58f97c..16f218f 100644
+--- a/src/components/layout/MainLayout.tsx
++++ b/src/components/layout/MainLayout.tsx
+@@ -640,6 +640,12 @@ export function MainLayout() {
+       id: 'observe',
+       labelKey: 'nav_groups.observe',
+       items: [
++        {
++          path: '/usage',
++          labelKey: 'usage_companion.title',
++          metaKey: 'usage_companion.description',
++          icon: sidebarIcons.dashboard,
++        },
+         {
+           path: '/quota',
+           labelKey: 'nav.quota_management',
+diff --git a/src/features/usage/UsagePage.module.scss b/src/features/usage/UsagePage.module.scss
+new file mode 100644
+index 0000000..1b9a06a
+--- /dev/null
++++ b/src/features/usage/UsagePage.module.scss
+@@ -0,0 +1,15 @@
++.frame {
++  display: block;
++  width: 100%;
++  height: calc(100dvh - var(--header-height) - 40px);
++  min-height: 480px;
++  border: 0;
++  background: var(--bg-secondary);
++}
++.state {
++  display: flex;
++  flex-direction: column;
++  align-items: flex-start;
++  gap: 16px;
++  color: var(--text-primary);
++}
+diff --git a/src/features/usage/UsagePage.tsx b/src/features/usage/UsagePage.tsx
+new file mode 100644
+index 0000000..9b486a3
+--- /dev/null
++++ b/src/features/usage/UsagePage.tsx
+@@ -0,0 +1,116 @@
++import { useCallback, useEffect, useRef, useState } from 'react';
++import { useTranslation } from 'react-i18next';
++import { Button } from '@/components/ui/Button';
++import { useAuthStore, useThemeStore } from '@/stores';
++import styles from './UsagePage.module.scss';
++
++const COLLECTOR = 'http://127.0.0.1:8318';
++
++export function UsagePage() {
++  const { t, i18n } = useTranslation();
++  const apiBase = useAuthStore((state) => state.apiBase);
++  const managementKey = useAuthStore((state) => state.managementKey);
++  const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
++  const frame = useRef<HTMLIFrameElement>(null);
++  const [session, setSession] = useState<{ connection: string; token: string } | null>(null);
++  const [failed, setFailed] = useState(false);
++  const [attempt, setAttempt] = useState(0);
++  const connection = JSON.stringify([apiBase, managementKey]);
++  const token = session?.connection === connection ? session.token : null;
++
++  useEffect(() => {
++    const controller = new AbortController();
++    const timeout = window.setTimeout(() => controller.abort(), 10000);
++    let current = true;
++    setFailed(false);
++    const connect = async () => {
++      try {
++        const response = await fetch(`${COLLECTOR}/api/management-session`, {
++          method: 'POST',
++          headers: {
++            'Content-Type': 'application/json',
++            'X-Quota-Client': '1',
++            Authorization: `Bearer ${managementKey}`,
++          },
++          body: JSON.stringify({ proxy_url: apiBase.replace(/\/$/, '') }),
++          signal: controller.signal,
++          credentials: 'omit',
++          redirect: 'error',
++        });
++        if (!response.ok) throw new Error('Collector connection rejected');
++        const payload: unknown = await response.json();
++        if (
++          !payload ||
++          typeof payload !== 'object' ||
++          !('token' in payload) ||
++          typeof payload.token !== 'string' ||
++          !payload.token
++        ) {
++          throw new Error('Invalid collector session');
++        }
++        if (current) setSession({ connection, token: payload.token });
++      } catch {
++        if (current) setFailed(true);
++      } finally {
++        window.clearTimeout(timeout);
++      }
++    };
++    void connect();
++    return () => {
++      current = false;
++      window.clearTimeout(timeout);
++      controller.abort();
++    };
++  }, [apiBase, managementKey, connection, attempt]);
++
++  const appearance = useCallback(() => {
++    frame.current?.contentWindow?.postMessage(
++      {
++        type: 'quota-appearance',
++        theme: resolvedTheme,
++        language: i18n.language.startsWith('ko') ? 'ko' : 'en',
++      },
++      COLLECTOR
++    );
++  }, [resolvedTheme, i18n.language]);
++
++  useEffect(() => {
++    const ready = (event: MessageEvent) => {
++      if (
++        event.origin === COLLECTOR &&
++        event.source === frame.current?.contentWindow &&
++        event.data?.type === 'quota-ready'
++      )
++        appearance();
++    };
++    window.addEventListener('message', ready);
++    appearance();
++    return () => window.removeEventListener('message', ready);
++  }, [appearance, token]);
++
++  if (!token || failed) {
++    return (
++      <section className={styles.state} aria-live="polite">
++        <h1>{t('usage_companion.title')}</h1>
++        <p>{t(failed ? 'usage_companion.unavailable' : 'usage_companion.connecting')}</p>
++        {failed && (
++          <>
++            <code>cli-proxy-quota dashboard --no-open</code>
++            <Button onClick={() => setAttempt((value) => value + 1)}>{t('common.refresh')}</Button>
++          </>
++        )}
++      </section>
++    );
++  }
++
++  return (
++    <iframe
++      ref={frame}
++      className={styles.frame}
++      title={t('usage_companion.title')}
++      src={`${COLLECTOR}/?embedded=1#token=${encodeURIComponent(token)}`}
++      referrerPolicy="origin"
++      onLoad={appearance}
++    />
++  );
++}
+diff --git a/src/i18n/locales/en.json b/src/i18n/locales/en.json
+index e0514ba..d98cd7f 100644
+--- a/src/i18n/locales/en.json
++++ b/src/i18n/locales/en.json
+@@ -2199,5 +2199,11 @@
+     "modelCatalog": {
+       "notLoaded": "Not loaded"
+     }
++  },
++  "usage_companion": {
++    "title": "Usage",
++    "description": "Requests and tokens over time",
++    "connecting": "Connecting to the local usage collector…",
++    "unavailable": "The local CLIProxy-quota collector is unavailable or is connected to a different proxy. Start it on this computer with the same proxy address and management key, then refresh."
+   }
+ }
+diff --git a/src/i18n/locales/ru.json b/src/i18n/locales/ru.json
+index 21b8286..40aec01 100644
+--- a/src/i18n/locales/ru.json
++++ b/src/i18n/locales/ru.json
+@@ -2193,5 +2193,11 @@
+     "modelCatalog": {
+       "notLoaded": "Не загружено"
+     }
++  },
++  "usage_companion": {
++    "title": "Использование",
++    "description": "История запросов и токенов",
++    "connecting": "Подключение к локальному сборщику…",
++    "unavailable": "Локальный сборщик CLIProxy-quota недоступен или подключён к другому прокси. Запустите его на этом компьютере с тем же адресом прокси и ключом управления, затем обновите страницу."
+   }
+ }
+diff --git a/src/i18n/locales/zh-CN.json b/src/i18n/locales/zh-CN.json
+index 163efa9..642513a 100644
+--- a/src/i18n/locales/zh-CN.json
++++ b/src/i18n/locales/zh-CN.json
+@@ -2197,5 +2197,11 @@
+     "modelCatalog": {
+       "notLoaded": "未加载"
+     }
++  },
++  "usage_companion": {
++    "title": "用量统计",
++    "description": "请求与 Token 历史",
++    "connecting": "正在连接本地用量收集器…",
++    "unavailable": "本地 CLIProxy-quota 收集器不可用，或连接了其他代理。请在此电脑启动收集器，使用相同代理地址和管理密钥，然后刷新。"
+   }
+ }
+diff --git a/src/i18n/locales/zh-TW.json b/src/i18n/locales/zh-TW.json
+index e3fb75f..a864dbc 100644
+--- a/src/i18n/locales/zh-TW.json
++++ b/src/i18n/locales/zh-TW.json
+@@ -2223,5 +2223,11 @@
+     "modelCatalog": {
+       "notLoaded": "未載入"
+     }
++  },
++  "usage_companion": {
++    "title": "用量統計",
++    "description": "請求與 Token 歷史",
++    "connecting": "正在連接本機用量收集器…",
++    "unavailable": "本機 CLIProxy-quota 收集器無法使用，或連接了其他代理。請在此電腦啟動收集器，使用相同代理位址和管理金鑰，然後重新整理。"
+   }
+ }
+diff --git a/src/router/MainRoutes.tsx b/src/router/MainRoutes.tsx
+index 880c869..978aaad 100644
+--- a/src/router/MainRoutes.tsx
++++ b/src/router/MainRoutes.tsx
+@@ -1,5 +1,6 @@
+ import { Navigate, useRoutes, type Location } from 'react-router-dom';
+ import { DashboardPage } from '@/features/dashboard/DashboardPage';
++import { UsagePage } from '@/features/usage/UsagePage';
+ import { ProvidersWorkbenchPage } from '@/features/providers/ProvidersWorkbenchPage';
+ import { AuthFilesPage } from '@/features/authFiles/AuthFilesPage';
+ import { AuthFilesOAuthExcludedEditPage } from '@/pages/AuthFilesOAuthExcludedEditPage';
+@@ -17,6 +18,7 @@ import { useAuthStore } from '@/stores';
+ const createMainRoutes = (supportsPlugin: boolean) => [
+   { path: '/', element: <DashboardPage /> },
+   { path: '/dashboard', element: <DashboardPage /> },
++  { path: '/usage', element: <UsagePage /> },
+   { path: '/settings', element: <Navigate to="/config" replace /> },
+   { path: '/api-keys', element: <Navigate to="/config" replace /> },
+   { path: '/quick-start', element: <ProvidersWorkbenchPage fixedBrand="apikeyFun" /> },

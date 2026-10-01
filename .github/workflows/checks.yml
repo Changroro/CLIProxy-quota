@@ -12,6 +12,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 librsvg2-common fonts-noto-cjk at-spi2-core xvfb
       - name: Unit tests
         run: uv run --no-project --python /usr/bin/python3 python -m unittest discover -s tests -v
+      - name: Dashboard JavaScript and translations
+        run: |
+          node --check cli_proxy_quota/web/app.js
+          node tests/check_web.mjs
       - name: Render English and Korean themes
         run: |
           for language in en ko; do

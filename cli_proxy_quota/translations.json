@@ -139,5 +139,6 @@
   "시스템 언어": "System language",
   "언어 설정을 적용하지 못했습니다.": "Could not apply language settings.",
   "language는 system, en, ko 중 하나여야 합니다.": "language must be system, en or ko",
-  "닫기": "Close"
+  "닫기": "Close",
+  "계정 정보를 조회하고 있습니다.": "Loading account details."
 }

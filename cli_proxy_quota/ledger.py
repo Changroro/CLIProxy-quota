@@ -1,8 +1,10 @@
 from .i18n import t
 import sqlite3
+import math
 from contextlib import closing
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 SCHEMA = """
@@ -23,6 +25,11 @@ CREATE TABLE IF NOT EXISTS executions (
     total_tokens INTEGER CHECK (total_tokens >= 0)
 );
 CREATE INDEX IF NOT EXISTS executions_period ON executions(requested_at);
+CREATE TABLE IF NOT EXISTS collection_runs (
+    id INTEGER PRIMARY KEY,
+    started_at REAL NOT NULL,
+    last_collected_at REAL
+);
 """
 
 
@@ -86,12 +93,21 @@ class Ledger:
             )
             return db.total_changes - before
 
-    def summary(self, start, end, account=None):
+    def filters(self, start, end, account=None, provider=None, model=None):
+        if not all(isinstance(value, (int, float)) and math.isfinite(value) for value in (start, end)) or end <= start:
+            raise ValueError("Invalid time range")
         where = "requested_at >= ? AND requested_at < ?"
         values = [start, end]
-        if account is not None:
-            where += " AND account_id = ?"
-            values.append(account)
+        for column, value in (("account_id", account), ("provider", provider), ("model", model)):
+            if value is not None:
+                if not isinstance(value, str) or not value:
+                    raise ValueError("Invalid usage filter")
+                where += f" AND {column} = ?"
+                values.append(value)
+        return where, values
+
+    def summary(self, start, end, account=None, provider=None, model=None):
+        where, values = self.filters(start, end, account, provider, model)
         with closing(sqlite3.connect(self.path)) as db:
             db.row_factory = sqlite3.Row
             result = db.execute(
@@ -104,3 +120,39 @@ class Ledger:
                 "FROM executions WHERE " + where, values,
             ).fetchone()
         return dict(result)
+
+    def dashboard(self, start, end, account=None, provider=None, model=None, timezone="UTC"):
+        where, values = self.filters(start, end, account, provider, model)
+        try:
+            zone = ZoneInfo(timezone)
+        except (ValueError, ZoneInfoNotFoundError, TypeError):
+            raise ValueError("Invalid timezone") from None
+        metrics = ("COUNT(*) AS requests, SUM(failed) AS failures, "
+                   "COUNT(*) - COUNT(total_tokens) AS unmeasured, "
+                   "SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens, "
+                   "SUM(cache_read_tokens) AS cache_read_tokens, SUM(cache_write_tokens) AS cache_write_tokens, "
+                   "SUM(reasoning_tokens) AS reasoning_tokens, "
+                   "SUM(total_tokens) AS total_tokens")
+        bucket = 3600 if end - start <= 2 * 86400 else 86400
+        with closing(sqlite3.connect(self.path)) as db:
+            db.row_factory = sqlite3.Row
+            db.create_function("local_day", 1, lambda moment: datetime.fromtimestamp(moment, zone).replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+            db.execute("BEGIN")
+            summary = db.execute(f"SELECT {metrics} FROM executions WHERE {where}", values).fetchone()
+            accounts = db.execute(f"SELECT provider, account_id, {metrics} FROM executions WHERE {where} GROUP BY provider, account_id ORDER BY total_tokens DESC", values).fetchall()
+            daily = db.execute(f"SELECT local_day(requested_at) AS timestamp, {metrics} FROM executions WHERE {where} GROUP BY timestamp ORDER BY timestamp", values).fetchall()
+            timeline = daily if bucket == 86400 else db.execute(f"SELECT CAST((requested_at - ?) / ? AS INTEGER) * ? + ? AS timestamp, {metrics} FROM executions WHERE {where} GROUP BY timestamp ORDER BY timestamp", [start, bucket, bucket, start, *values]).fetchall()
+            models = [row[0] for row in db.execute("SELECT DISTINCT model FROM executions ORDER BY model")]
+            coverage = db.execute("SELECT MIN(started_at) AS started_at, MAX(last_collected_at) AS last_collected_at FROM collection_runs").fetchone()
+            runs = db.execute("SELECT started_at, last_collected_at FROM collection_runs ORDER BY started_at").fetchall()
+        return {"summary": dict(summary), "accounts": [dict(row) for row in accounts],
+                "timeline": [dict(row) for row in timeline], "daily": [dict(row) for row in daily], "models": models,
+                "coverage": dict(coverage), "collection_runs": [dict(row) for row in runs], "bucket_seconds": bucket, "timezone": timezone}
+
+    def start_collection(self, moment):
+        with closing(sqlite3.connect(self.path)) as db, db:
+            return db.execute("INSERT INTO collection_runs(started_at) VALUES (?)", [moment]).lastrowid
+
+    def mark_collected(self, run_id, moment):
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute("UPDATE collection_runs SET last_collected_at = ? WHERE id = ?", [moment, run_id])

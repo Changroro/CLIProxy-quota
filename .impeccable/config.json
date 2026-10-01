@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "files": [
+          "management-theme/minimal.scss"
+        ],
+        "createdAt": "2026-10-01T00:49:01.099Z",
+        "reason": "User approved the existing minimal design and requested applying that same theme to the official management UI; Inter preserves the established typography."
+      }
+    ]
+  }
+}

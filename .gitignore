@@ -12,3 +12,6 @@ prototype/
 DESIGN.md
 RESEARCH.md
 WIDGET_DESIGN.md
+node_modules/
+docs/video/stills/
+docs/video/.frames/

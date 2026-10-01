@@ -9,6 +9,13 @@ from cli_proxy_quota import configuration
 
 
 class ConfigurationTest(unittest.TestCase):
+    def test_management_link_uses_proxy_host_without_collector_token(self):
+        with patch.object(configuration, "stored_settings", return_value={
+            "base_url": "https://proxy.example:8317/", "management_key": "test",
+            "dashboard_url": "http://127.0.0.1:8318#token=private",
+        }), patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(configuration.management_url(), "https://proxy.example:8317/management.html?theme=cli-proxy-quota&v=usage")
+
     def test_theme_save_preserves_file_key_and_does_not_persist_environment_key(self):
         with tempfile.TemporaryDirectory() as directory, patch.object(
             configuration, "CONFIG_DIR", Path(directory)

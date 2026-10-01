@@ -1,0 +1,71 @@
+.page { gap: 28px; }
+.ambient,
+.heroWire { display: none; }
+.hero {
+  gap: 24px;
+  padding: 0;
+  align-items: start;
+}
+.heroCopy { gap: 12px; }
+.heroTitle { font-size: 32px; line-height: 1.25; letter-spacing: -0.02em; }
+.heroPeriodLive,
+.liveDot { animation: none; }
+.heroMeta,
+.heroPanelLabel,
+.liveBadge,
+.heroFigure,
+.heroPanelMeta,
+.heroSplit b,
+.statValue,
+.eyebrow,
+.fleetRank,
+.fleetTotal,
+.fleetRateValue,
+.healthLegend b,
+.typeChip b { font-family: inherit; }
+.heroPanel {
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  box-shadow: none;
+}
+.heroFigure { font-size: 36px; }
+.primaryAction,
+.ghostAction {
+  padding: 8px 12px;
+  border-radius: 6px;
+  box-shadow: none;
+}
+.primaryAction:hover,
+.ghostAction:hover { transform: none; box-shadow: none; }
+.liveBadge { background: var(--bg-tertiary); border-radius: 4px; color: var(--text-primary); }
+.statTile { border-radius: 8px; padding: 18px; background: var(--bg-primary); }
+.statTile::before { display: none; }
+.statValue { font-size: 28px; }
+.section { gap: 16px; }
+.sectionHead { gap: 4px; }
+.eyebrow { font-size: 12px; letter-spacing: 0; text-transform: none; }
+.sectionTitle { font-size: 20px; letter-spacing: -0.01em; }
+.panel { padding: 20px; border-radius: 8px; background: var(--bg-primary); }
+.fleetList { border-radius: 8px; background: var(--bg-primary); }
+.typeChip,
+.togglePill { border-radius: 4px; }
+.specMono { font-family: inherit; }
+.ctaCard {
+  border-radius: 8px;
+  padding: 18px;
+  background: var(--bg-primary);
+  box-shadow: none;
+}
+.ctaCard:hover { transform: none; box-shadow: none; }
+.ctaIcon { background: var(--bg-tertiary); border-radius: 6px; }
+@media (max-width: 900px) {
+  .hero { padding: 0; }
+}
+@media (max-width: 460px) {
+  .heroTitle { font-size: 26px; }
+  .statsRow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .statTile { padding: 14px; }
+  .statValue { font-size: 24px; }
+}

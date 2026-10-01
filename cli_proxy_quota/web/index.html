@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>CLIProxy-quota</title>
+    <link rel="icon" href="/assets/cliproxy.png" />
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <a class="brand" href="/" aria-label="CLIProxy-quota"
+          ><img
+            src="/assets/cliproxy.png"
+            alt=""
+            width="24"
+            height="24"
+          />CLIProxy-quota</a
+        >
+        <div class="tools">
+          <label
+            ><span class="sr-only" data-t="language">Language</span
+            ><select id="language">
+              <option value="ko">한국어</option>
+              <option value="en">English</option>
+            </select></label
+          ><label
+            ><span class="sr-only" data-t="theme">Theme</span
+            ><select id="theme">
+              <option value="system" data-t="system">System</option>
+              <option value="light" data-t="light">Light</option>
+              <option value="dark" data-t="dark">Dark</option>
+            </select></label
+          ><button id="refresh" data-t="refresh">Refresh</button>
+        </div>
+      </header>
+      <div class="page-heading">
+        <h1 data-t="usage">Usage</h1>
+        <p data-t="intro">
+          Requests and tokens observed since collection started.
+        </p>
+      </div>
+      <div id="notice" class="notice" role="status" aria-live="polite">
+        <span id="notice-text"></span
+        ><button id="enable" hidden data-t="enable">Enable recording</button>
+      </div>
+      <section class="filters" aria-label="Usage filters" data-t-aria="filters">
+        <div class="periods" id="periods">
+          <button data-period="today" aria-pressed="true" data-t="today">
+            Today</button
+          ><button data-period="7" aria-pressed="false" data-t="days7">
+            7 days</button
+          ><button data-period="14" aria-pressed="false" data-t="days14">
+            14 days</button
+          ><button data-period="30" aria-pressed="false" data-t="days30">
+            30 days</button
+          ><button data-period="all" aria-pressed="false" data-t="all">
+            All
+          </button>
+        </div>
+        <div class="filter-fields">
+          <label
+            ><span data-t="from">From</span
+            ><input id="start" type="date" /></label
+          ><label
+            ><span data-t="to">To</span><input id="end" type="date" /></label
+          ><label
+            ><span data-t="provider">Service</span
+            ><select id="provider">
+              <option value="" data-t="allProviders">All services</option>
+              <option value="codex">Codex</option>
+              <option value="claude">Claude</option>
+              <option value="openrouter">OpenRouter</option>
+            </select></label
+          ><label
+            ><span data-t="account">Account</span
+            ><select id="account">
+              <option value="" data-t="allAccounts">All accounts</option>
+            </select></label
+          ><label
+            ><span data-t="model">Model</span
+            ><select id="model">
+              <option value="" data-t="allModels">All models</option>
+            </select></label
+          >
+        </div>
+      </section>
+      <section class="stats" aria-label="Usage summary" data-t-aria="summary">
+        <article>
+          <span data-t="requests">Requests</span
+          ><strong id="requests">—</strong>
+        </article>
+        <article>
+          <span data-t="success">Success rate</span
+          ><strong id="success">—</strong>
+        </article>
+        <article>
+          <span data-t="total">Total tokens</span><strong id="total">—</strong>
+        </article>
+        <article>
+          <span data-t="input">Input tokens</span><strong id="input">—</strong>
+        </article>
+        <article>
+          <span data-t="output">Output tokens</span
+          ><strong id="output">—</strong>
+        </article>
+        <article>
+          <span data-t="cache">Cache tokens</span><strong id="cache">—</strong>
+        </article>
+      </section>
+      <div class="coverage">
+        <span id="coverage"></span><span id="quality"></span>
+      </div>
+      <section class="charts">
+        <article class="panel">
+          <div class="panel-heading">
+            <h2 data-t="trend">Token trend</h2>
+            <span class="legend"
+              ><i class="input-dot"></i><span data-t="input">Input tokens</span
+              ><i class="output-dot"></i
+              ><span data-t="output">Output tokens</span></span
+            >
+          </div>
+          <div id="line-chart" class="chart"></div>
+        </article>
+        <article class="panel">
+          <div class="panel-heading"><h2 data-t="daily">Daily tokens</h2></div>
+          <div id="bar-chart" class="chart"></div>
+        </article>
+      </section>
+      <section class="panel accounts-panel">
+        <div class="panel-heading">
+          <h2 data-t="accounts">Accounts</h2>
+          <label class="identity-toggle"
+            ><input id="identities" type="checkbox" /><span data-t="identities"
+              >Show account details</span
+            ></label
+          >
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th data-t="account">Account</th>
+                <th data-t="plan">Plan</th>
+                <th data-t="quota">Remaining quota</th>
+                <th data-t="requests">Requests</th>
+                <th data-t="input">Input tokens</th>
+                <th data-t="output">Output tokens</th>
+                <th data-t="cache">Cache tokens</th>
+                <th data-t="total">Total tokens</th>
+              </tr>
+            </thead>
+            <tbody id="accounts"></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="panel">
+        <h2 data-t="compare">Tokens by account</h2>
+        <div id="account-chart" class="chart account-chart"></div>
+      </section>
+      <details class="data-details">
+        <summary data-t="table">Chart data as a table</summary>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th data-t="time">Time</th>
+                <th data-t="input">Input tokens</th>
+                <th data-t="output">Output tokens</th>
+                <th data-t="total">Total tokens</th>
+              </tr>
+            </thead>
+            <tbody id="chart-data"></tbody>
+          </table>
+        </div>
+      </details>
+      <footer>
+        <p data-t="scope">
+          Includes only requests observed through CLIProxyAPI. Missing tokens
+          and collection gaps are not reported as zero. This is not a billing
+          report.
+        </p>
+        <span id="updated"></span>
+      </footer>
+      <noscript>JavaScript is required. / JavaScript를 켜주세요.</noscript>
+    </main>
+  </body>
+</html>
