@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 from . import client, configuration
+from .client import display_plan_type
 from .i18n import set_language
 
 import gi
@@ -38,7 +39,6 @@ STATUS_STYLES = {
     "low": ("부족", "warning"),
     "error": ("오류", "danger"),
 }
-PLAN_LABELS = {"prolite": "Pro Lite", "self_serve_business_prolite": "Business Pro Lite", "team": "Team", "pro": "Pro", "free": "Free", "credits": "Credits", "oauth": "플랜 미확인", "unknown": "플랜 미확인", "max": "Max", "max_5x": "Max 5x", "max_20x": "Max 20x"}
 BAR_COLORS = {"success": (34 / 255, 197 / 255, 94 / 255), "warning": (250 / 255, 204 / 255, 21 / 255), "danger": (239 / 255, 68 / 255, 68 / 255)}
 LIGHT_CSS = """
 .quota-window { background: #ffffff; color: #27272a; font-family: sans-serif; font-size: 10px; border: 1px solid #e4e4e7; border-radius: 8px; }
@@ -139,14 +139,6 @@ def visible_quota_windows(report):
     if any(window.get("label") == "7d" and window.get("remaining_percent") == 0 for window in windows):
         return [window for window in windows if window.get("label") != "5h"]
     return windows
-
-
-def display_plan_type(plan_type):
-    if not isinstance(plan_type, str) or not plan_type.strip():
-        raise ValueError(t("플랜 정보가 올바르지 않습니다."))
-    normalized = plan_type.strip().lower()
-    label = PLAN_LABELS.get(normalized, normalized.removeprefix("self_serve_").replace("_", " ").title())
-    return t(label) if label == "플랜 미확인" else label
 
 
 def load_aliases():
@@ -717,11 +709,10 @@ class QuotaWindow(Gtk.Window):
                 reset_at = quota_window.get("reset_at")
                 if isinstance(reset_at, str):
                     reset_time = datetime.fromisoformat(reset_at.replace("Z", "+00:00")).astimezone()
-                    short_reset = t("{v0}월 {v1}일", v0=reset_time.month, v1=reset_time.day)
+                    short_reset = t("{v0}월 {v1}일 {v2:%H:%M}", v0=reset_time.month, v1=reset_time.day, v2=reset_time)
                 else:
                     short_reset = t("미제공")
                 reset = Gtk.Label(label=short_reset, xalign=1)
-                reset.set_width_chars(7)
                 reset.get_style_context().add_class("reset")
                 row.pack_start(reset, False, False, 0)
                 metrics.pack_start(row, False, False, 0)

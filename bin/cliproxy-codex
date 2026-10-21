@@ -1,0 +1,17 @@
+#!/usr/bin/python3
+import os
+from pathlib import Path
+import shlex
+import sys
+
+root = Path(__file__).resolve().parents[1]
+binary = root / ".local/codex-statusline/codex-rs/target/dev-small/codex"
+if not binary.is_file():
+    raise SystemExit("Patched Codex has not been built. See docs/STATUSLINE.md.")
+sys.path.insert(0, str(root))
+from cli_proxy_quota import configuration, i18n
+
+i18n.set_language(os.environ.get("CLIPROXY_LANGUAGE", configuration.load_settings()["language"]))
+environment = os.environ.copy()
+environment["CXSTATUSLINE_COMMAND"] = shlex.join([str(root / "bin/cliproxy-statusline"), "--codex", "--language", i18n.LANGUAGE])
+os.execve(binary, [str(binary), "--no-daemon", *sys.argv[1:]], environment)

@@ -134,6 +134,7 @@
   "쿨다운 리셋에 실패했습니다.": "Could not reset cooldown.",
   "사용량 열기": "Open quota",
   "위젯 열기": "Open widget",
+  "{v0}월 {v1}일 {v2:%H:%M}": "{v0}/{v1} {v2:%H:%M}",
   "종료": "Quit",
   "{v0} {v1}/{v2} 사용 가능": "{v0} {v1}/{v2} available",
   "언어 / Language": "Language / 언어",

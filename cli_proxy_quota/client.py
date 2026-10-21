@@ -689,3 +689,13 @@ def reset_cooldowns():
         if result.get("status") != "ok":
             raise RuntimeError(t("쿨다운 초기화에 실패했습니다."))
     return t("계정 {v0}개의 프록시 쿨다운을 초기화했습니다.", v0=len(targets))
+
+
+PLAN_LABELS = {"prolite": "Pro Lite", "self_serve_business_prolite": "Business Pro Lite", "team": "Team", "pro": "Pro", "free": "Free", "credits": "Credits", "oauth": "플랜 미확인", "unknown": "플랜 미확인", "max": "Max", "max_5x": "Max 5x", "max_20x": "Max 20x"}
+
+def display_plan_type(plan_type):
+    if not isinstance(plan_type, str) or not plan_type.strip():
+        raise ValueError(t("플랜 정보가 올바르지 않습니다."))
+    normalized = plan_type.strip().lower()
+    label = PLAN_LABELS.get(normalized, normalized.removeprefix("self_serve_").replace("_", " ").title())
+    return t(label) if label == "플랜 미확인" else label
