@@ -53,6 +53,24 @@ class ClaudePlanTest(unittest.TestCase):
         self.assertEqual(reports[0]["plan_type"], "unknown")
         self.assertTrue(errors[0]["plan_lookup_failed"])
 
+    def test_null_window_is_skipped_and_not_restored_from_cache(self):
+        module = load_module()
+        auth = {"provider": "claude", "auth_index": "a", "email": "test@example.test"}
+        both = {key: {"utilization": 20, "resets_at": "2026-10-01T00:00:00Z"} for key in ("five_hour", "seven_day")}
+        state = {}
+        before = datetime(2026, 9, 30, tzinfo=timezone.utc)
+        reports = [module.normalize_claude_usage(auth, both)]
+        module.apply_reset_history(reports, state, before)
+
+        reports = [module.normalize_claude_usage(auth, {**both, "five_hour": None})]
+        self.assertEqual([window["label"] for window in reports[0]["windows"]], ["7d"])
+        module.apply_reset_history(reports, state, datetime(2026, 10, 1, tzinfo=timezone.utc))
+        cached = module.cached_claude_report(auth, state, datetime(2026, 10, 2, tzinfo=timezone.utc))
+        self.assertEqual([window["label"] for window in cached["windows"]], ["7d"])
+
+        with self.assertRaises(RuntimeError):
+            module.normalize_claude_usage(auth, {"five_hour": None, "seven_day": None})
+
 
 
 class ResetHistoryTest(unittest.TestCase):

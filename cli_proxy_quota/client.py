@@ -226,6 +226,8 @@ def normalize_claude_usage(auth, usage):
     windows = []
     for key_name, label in (("five_hour", "5h"), ("seven_day", "7d")):
         source = usage.get(key_name)
+        if source is None:
+            continue
         if not isinstance(source, dict) or not isinstance(source.get("utilization"), (int, float)):
             raise RuntimeError(t("Claude {v0} 사용량 정보가 없습니다: {v1}", v0=label, v1=auth.get('email')))
         used = max(0.0, min(100.0, float(source["utilization"])))
@@ -242,6 +244,8 @@ def normalize_claude_usage(auth, usage):
                 "reset_label": local_label(reset_at),
             }
         )
+    if not windows:
+        raise RuntimeError(t("Claude {v0} 사용량 정보가 없습니다: {v1}", v0="5h·7d", v1=auth.get('email')))
     auth_index = auth.get("auth_index")
     email = auth.get("email") or auth.get("account")
     name = auth.get("name") or email
@@ -489,24 +493,24 @@ def codex_reports(key, auths):
 def cached_claude_report(auth, state, retry_at):
     auth_index = auth["auth_index"]
     windows_state = state.get("windows", {})
-    cached_usage = {}
-    observed_at = []
-    for state_window, usage_window in (("five_hour", "five_hour"), ("seven_day", "seven_day")):
-        record = windows_state.get(f"claude:{auth_index}:{state_window}", {})
-        observation = record.get("observation", {})
-        used = observation.get("used_value")
-        if not isinstance(used, (int, float)):
-            return None
-        cached_usage[usage_window] = {
-            "utilization": used,
-            "resets_at": observation.get("reset_at"),
-        }
+    observations = {}
+    for window_id in ("five_hour", "seven_day"):
+        observation = windows_state.get(f"claude:{auth_index}:{window_id}", {}).get("observation", {})
         seen_at = parse_time(observation.get("observed_at"))
-        if seen_at is not None:
-            observed_at.append(seen_at)
+        if isinstance(observation.get("used_value"), (int, float)) and seen_at is not None:
+            observations[window_id] = (seen_at, observation)
+    if not observations:
+        return None
+    # 마지막 성공 조회에 없던 창(사라진 5시간 한도 등)의 옛 기록은 되살리지 않는다.
+    latest = max(seen_at for seen_at, _ in observations.values())
+    cached_usage = {
+        window_id: {"utilization": observation["used_value"], "resets_at": observation.get("reset_at")}
+        for window_id, (seen_at, observation) in observations.items()
+        if seen_at == latest
+    }
     report = normalize_claude_usage({**auth, "plan_type": state.get("claude_plans", {}).get(auth_index)}, cached_usage)
     report["stale"] = True
-    report["stale_as_of"] = min(observed_at).isoformat().replace("+00:00", "Z") if observed_at else None
+    report["stale_as_of"] = latest.isoformat().replace("+00:00", "Z")
     report["retry_at"] = retry_at.isoformat().replace("+00:00", "Z")
     return report
 
