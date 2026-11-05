@@ -97,6 +97,9 @@ def api_call(key, auth_index, url, headers):
         raise RuntimeError(t("{v0} 사용량 응답이 JSON이 아닙니다.", v0=url)) from error
 
 
+IMAGE_LIMIT_IDS = ("imagegen_premium", "image_gen")
+
+
 def iso_from_epoch(value):
     if not isinstance(value, (int, float)):
         return None
@@ -143,6 +146,29 @@ def report_status(windows):
     return "high"
 
 
+def image_limit_window(auth, now):
+    # OpenAI 비공개 헤더라 이미지 호출 때만 갱신된다. wham/usage에는 이 한도가 없다.
+    window = {"id": "image", "label": t("이미지"), "used_value": 0.0, "remaining_percent": None,
+              "reset_at": None, "reset_label": t("API 미제공")}
+    quotas = auth.get("model_quotas")
+    rows = [
+        row for row in (quotas.values() if isinstance(quotas, dict) else ())
+        if isinstance(row, dict) and isinstance(row.get("signals"), dict)
+        and row["signals"].get("X-Codex-Active-Limit") in IMAGE_LIMIT_IDS
+    ]
+    try:
+        observed_at, latest = max(((parse_time(row.get("observed_at")), row) for row in rows), key=lambda item: item[0])
+        used = max(0.0, min(100.0, float(latest["signals"]["X-Codex-Primary-Used-Percent"])))
+        reset_at = iso_from_epoch(int(latest["signals"]["X-Codex-Primary-Reset-At"]))
+    except (KeyError, TypeError, ValueError):
+        return {**window, "unknown": True}
+    window["observed_label"] = local_label(observed_at.isoformat())
+    if parse_time(reset_at) <= now:
+        return {**window, "remaining_percent": 100.0, "reset_label": t("초기화됨"), "reset_passed": True}
+    return {**window, "used_value": used, "remaining_percent": 100.0 - used,
+            "reset_at": reset_at, "reset_label": local_label(reset_at)}
+
+
 def normalize_codex_usage(auth, usage):
     rate_limit = usage.get("rate_limit")
     if not isinstance(rate_limit, dict):
@@ -184,7 +210,7 @@ def normalize_codex_usage(auth, usage):
         "provider": "codex",
         "priority": auth.get("priority", 0),
         "status": report_status(windows),
-        "windows": windows,
+        "windows": [*windows, image_limit_window(auth, datetime.now(timezone.utc))],
     }
 
 
@@ -417,8 +443,10 @@ def set_codex_order(auth_indices):
     key = management_key()
     auths = [row for row in active_auths(key) if row.get("provider") == "codex"]
     current = {row.get("auth_index"): row for row in auths}
-    if not auth_indices or len(auth_indices) != len(current) or set(auth_indices) != set(current):
+    visible = {row.get("auth_index") for row in auths if not is_free_codex(row)}
+    if not auth_indices or len(auth_indices) != len(visible) or set(auth_indices) != visible:
         raise RuntimeError(t("Codex 계정 목록이 바뀌었습니다. 새로고침한 뒤 다시 저장하세요."))
+    auth_indices = [*auth_indices, *(row.get("auth_index") for row in auths if is_free_codex(row))]
     if not all(isinstance(auth.get("id"), str) and auth["id"] for auth in auths):
         raise RuntimeError(t("Codex 계정 저장용 ID가 없습니다."))
     strategy = management_request(key, "/v8/management/config/routing/strategy")
@@ -452,9 +480,14 @@ def set_codex_order(auth_indices):
         raise
 
 
+def is_free_codex(auth):
+    token = auth.get("id_token")
+    return isinstance(token, dict) and token.get("plan_type") == "free"
+
+
 def codex_reports(key, auths):
     reports = []
-    for auth in (row for row in auths if row.get("provider") == "codex"):
+    for auth in (row for row in auths if row.get("provider") == "codex" and not is_free_codex(row)):
         auth_index = auth.get("auth_index")
         account_id = auth.get("account")
         if not all(isinstance(value, str) and value for value in (auth_index, account_id)):

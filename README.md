@@ -98,6 +98,7 @@ The minimal light/dark theme preserves official credentials, OAuth, quota, confi
 
 - Input excludes cache; output includes reasoning. Total = uncached input + cache read/write + output.
 - Execution IDs prevent duplicate ingestion. Retries may create separate execution records.
+- The image row shows the undocumented `imagegen_premium` 24-hour limit from proxy response headers. It only updates when an image request runs, so hover it for the last check time. It does not change the account status.
 - Missing measurements remain unknown. Prices and past usage are not invented.
 - For the local history screen, management keys stay server-side and the browser uses a local session. The official management screen uses its existing management-key login. SQLite stores only accounting fields, not API keys, OAuth tokens or request bodies.
 

@@ -108,7 +108,7 @@ def load_reports():
                     event = window.get("last_reset_event")
                     window["last_reset_label"] = client.format_event(event) if isinstance(event, dict) else t("초기화 관측 없음")
                     if window.get("reset_at") is None:
-                        window["reset_label"] = t("API 미제공")
+                        window["reset_label"] = t("초기화됨") if window.get("reset_passed") else t("API 미제공")
             return snapshot["reports"], snapshot["errors"]
     return client.collect_reports()
 
@@ -686,6 +686,7 @@ class QuotaWindow(Gtk.Window):
         metrics = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         metrics.get_style_context().add_class("quota-metric")
         metrics.set_margin_start(28)
+        periods = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
         for quota_window in windows:
             remaining = quota_window.get("remaining_percent")
             label = quota_window.get("label")
@@ -693,13 +694,18 @@ class QuotaWindow(Gtk.Window):
             last_reset_label = quota_window.get("last_reset_label")
             if not all(isinstance(value, str) for value in (label, reset_label, last_reset_label)):
                 raise ValueError(t("사용량 기간 정보가 올바르지 않습니다."))
-            if isinstance(remaining, (int, float)):
+            if quota_window.get("unknown"):
+                metrics.pack_start(Gtk.Label(label=t("{v0}  확인 불가", v0=label), xalign=0), False, False, 0)
+            elif isinstance(remaining, (int, float)):
                 color_class = "danger" if remaining < 20 else "warning" if remaining < 50 else "success"
                 row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
                 row.get_style_context().add_class("quota-metric")
-                row.set_tooltip_text(t("{v0} 다음 초기화: {v1}\n직전 초기화: {v2}", v0=label, v1=reset_label, v2=last_reset_label))
+                tooltip = t("{v0} 다음 초기화: {v1}\n직전 초기화: {v2}", v0=label, v1=reset_label, v2=last_reset_label)
+                observed_label = quota_window.get("observed_label")
+                row.set_tooltip_text(f"{tooltip}\n{t('마지막 확인: {v0}', v0=observed_label)}" if observed_label else tooltip)
                 period = Gtk.Label(label=label.removesuffix(" free"), xalign=0)
                 period.set_width_chars(2)
+                periods.add_widget(period)
                 row.pack_start(period, False, False, 0)
                 row.pack_start(QuotaBar(remaining, BAR_COLORS[color_class]), True, True, 0)
                 percent = Gtk.Label(label=f"{remaining:g}%", xalign=1)
@@ -711,7 +717,7 @@ class QuotaWindow(Gtk.Window):
                     reset_time = datetime.fromisoformat(reset_at.replace("Z", "+00:00")).astimezone()
                     short_reset = t("{v0}월 {v1}일 {v2:%H:%M}", v0=reset_time.month, v1=reset_time.day, v2=reset_time)
                 else:
-                    short_reset = t("미제공")
+                    short_reset = reset_label if quota_window.get("reset_passed") else t("미제공")
                 reset = Gtk.Label(label=short_reset, xalign=1)
                 reset.get_style_context().add_class("reset")
                 row.pack_start(reset, False, False, 0)

@@ -106,6 +106,94 @@ class CodexControlsTest(unittest.TestCase):
         )
         self.assertEqual(report["plan_type"], "team")
 
+    @staticmethod
+    def image_signals(used, reset_at, limit="imagegen_premium"):
+        return {"X-Codex-Active-Limit": limit, "X-Codex-Primary-Used-Percent": str(used),
+                "X-Codex-Primary-Reset-At": str(reset_at), "X-Codex-Primary-Window-Minutes": "1440"}
+
+    def test_image_window_uses_latest_image_model_only(self):
+        module = load_module()
+        now = datetime(2026, 11, 5, 0, 0, tzinfo=timezone.utc)
+        reset_at = int(now.timestamp()) + 3600
+        window = module.image_limit_window({"model_quotas": {
+            "gpt-image-2": {"observed_at": "2026-11-04T16:14:09.123456789+08:00", "signals": self.image_signals(31, reset_at)},
+            "gpt-image-2.5": {"observed_at": "2026-11-04T23:36:17.973383871+08:00", "signals": self.image_signals(100, reset_at)},
+            "gpt-6-luna": {"observed_at": "2026-11-05T07:00:00+08:00", "signals": self.image_signals(4, reset_at, "premium")},
+        }}, now)
+        self.assertEqual(window["remaining_percent"], 0)
+        self.assertEqual(window["used_value"], 100)
+        self.assertEqual(window["reset_at"], "2026-11-05T01:00:00Z")
+        self.assertIn("observed_label", window)
+
+    def test_image_window_shows_reset_after_reset_time_passes(self):
+        module = load_module()
+        now = datetime(2026, 11, 5, 0, 0, tzinfo=timezone.utc)
+        window = module.image_limit_window({"model_quotas": {"gpt-image-2.5": {
+            "observed_at": "2026-11-04T07:00:00+08:00", "signals": self.image_signals(100, int(now.timestamp()) - 1),
+        }}}, now)
+        self.assertEqual(window["remaining_percent"], 100)
+        self.assertEqual(window["reset_label"], "초기화됨")
+        self.assertIsNone(window["reset_at"])
+
+    def test_image_window_is_unknown_without_valid_signal(self):
+        module = load_module()
+        now = datetime(2026, 11, 5, 0, 0, tzinfo=timezone.utc)
+        broken = {"observed_at": "2026-11-04T07:00:00+08:00", "signals": {"X-Codex-Active-Limit": "image_gen"}}
+        for auth in ({}, {"model_quotas": {"gpt-image-2": broken}}):
+            window = module.image_limit_window(auth, now)
+            self.assertTrue(window["unknown"])
+            self.assertIsNone(window["remaining_percent"])
+
+    def test_exhausted_image_limit_does_not_change_account_status(self):
+        module = load_module()
+        report = module.normalize_codex_usage(
+            {"auth_index": "a", "name": "a", "email": "account@example.test", "model_quotas": {"gpt-image-2": {
+                "observed_at": "2099-01-01T00:00:00+00:00", "signals": self.image_signals(100, 4070908800)}}},
+            {"rate_limit": {"primary_window": {"used_percent": 0, "limit_window_seconds": 18000, "reset_at": 1790740800}}},
+        )
+        self.assertEqual(report["status"], "high")
+        self.assertEqual([window["id"] for window in report["windows"]], ["18000", "image"])
+        self.assertEqual(report["windows"][1]["remaining_percent"], 0)
+
+    def test_reset_history_records_image_reset_once_reset_time_passes(self):
+        module = load_module()
+        state = {}
+        first = datetime(2026, 11, 5, 0, 0, tzinfo=timezone.utc)
+        second = datetime(2026, 11, 5, 2, 0, tzinfo=timezone.utc)
+        auth = {"model_quotas": {"gpt-image-2": {"observed_at": "2026-11-05T07:00:00+08:00",
+                "signals": self.image_signals(100, int(first.timestamp()) + 3600)}}}
+        for moment in (first, second):
+            report = {"provider": "codex", "account_id": "a", "windows": [module.image_limit_window(auth, moment)]}
+            module.apply_reset_history([report], state, moment)
+        self.assertEqual(state["windows"]["codex:a:image"]["last_reset"]["exact_at"], "2026-11-05T01:00:00Z")
+
+    def test_free_codex_account_is_not_collected(self):
+        module = load_module()
+        paid = {"provider": "codex", "auth_index": "paid", "account": "acct", "name": "paid", "email": "paid@example.test",
+                "id_token": {"plan_type": "team"}}
+        free = {"provider": "codex", "auth_index": "free", "account": "acct", "name": "free", "email": "free@example.test",
+                "id_token": {"plan_type": "free"}}
+        usage = {"rate_limit": {"primary_window": {"used_percent": 0, "limit_window_seconds": 18000, "reset_at": 1790740800}}}
+        with patch.object(module, "api_call", side_effect=[usage, {}]) as api_call:
+            reports = module.codex_reports("key", [paid, free])
+        self.assertEqual([report["auth_index"] for report in reports], ["paid"])
+        self.assertEqual({row.args[1] for row in api_call.call_args_list}, {"paid"})
+
+    def test_order_save_keeps_hidden_free_account_last(self):
+        module = load_module()
+        rows = [
+            {"provider": "codex", "auth_index": "a", "id": "a.json", "priority": 1, "id_token": {"plan_type": "team"}},
+            {"provider": "codex", "auth_index": "f", "id": "f.json", "priority": 3, "id_token": {"plan_type": "free"}},
+            {"provider": "codex", "auth_index": "b", "id": "b.json", "priority": 2, "id_token": {"plan_type": "team"}},
+        ]
+        def request(_key, path, payload=None, method=None):
+            return "fill-first" if path.endswith("strategy") else {"status": "ok"}
+        with patch.object(module, "management_key", return_value="key"), patch.object(module, "active_auths", return_value=rows), \
+                patch.object(module, "management_request", side_effect=request) as management_request:
+            module.set_codex_order(["b", "a"])
+        saved = [row.args[2] for row in management_request.call_args_list if row.args[1].endswith("fields")]
+        self.assertEqual(saved, [{"name": "b.json", "priority": 3}, {"name": "a.json", "priority": 2}, {"name": "f.json", "priority": 1}])
+
     def test_reset_credits_keep_only_available_expiry_dates(self):
         module = load_module()
         credits = module.normalize_reset_credits({
