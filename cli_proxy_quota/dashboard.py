@@ -121,7 +121,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.respond(500, {"error": "Could not query local usage history"})
             return
         paths = {"/": WEB_DIR / "index.html", "/app.js": WEB_DIR / "app.js", "/style.css": WEB_DIR / "style.css", "/i18n.js": WEB_DIR / "i18n.js"}
-        for name in ("cliproxy.png", "codex-symbolic.svg", "claude-symbolic.svg", "openrouter-light.svg", "openrouter-dark.svg"):
+        for name in ("cliproxy.png", "codex-symbolic.svg", "claude-symbolic.svg", "api-key-symbolic.svg", "openrouter-light.svg", "openrouter-dark.svg"):
             paths[f"/assets/{name}"] = ASSET_DIR / name
         path = paths.get(parsed.path)
         if path is None:

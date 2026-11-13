@@ -686,6 +686,75 @@ def openrouter_reports(key, observed_at):
     return reports
 
 
+API_KEY_SOURCES = (
+    ("claude", "/v0/management/claude-api-key", "claude-api-key"),
+    ("codex", "/v0/management/codex-api-key", "codex-api-key"),
+)
+
+
+def normalize_api_key_usage(service, name, auth_index, entry):
+    buckets = entry.get("recent_requests")
+    if not isinstance(buckets, list) or not buckets or not all(
+        isinstance(bucket, dict) and type(bucket.get("success")) is int and type(bucket.get("failed")) is int
+        for bucket in buckets
+    ):
+        raise RuntimeError(t("API key 최근 요청 통계 형식이 올바르지 않습니다: {v0}", v0=name))
+    failed = sum(bucket["failed"] for bucket in buckets)
+    used = failed + sum(bucket["success"] for bucket in buckets)
+    windows = [
+        {
+            "id": "recent",
+            # CLIProxyAPI recent_requests buckets are 10 minutes each.
+            "label": t("최근 {v0}분", v0=len(buckets) * 10),
+            "used_value": used,
+            "used_count": used,
+            "failed_count": failed,
+            "limit_count": None,
+            "remaining_percent": None,
+            "reset_at": None,
+            "reset_label": t("한도 API 없음"),
+        }
+    ]
+    return {
+        "account_id": auth_index,
+        "auth_index": auth_index,
+        "email": f"{name} · {auth_index}",
+        "name": f"api-key-{auth_index}",
+        "plan_type": "api",
+        "provider": "api-key",
+        "icon": service if service in ("claude", "codex") else "api-key",
+        "status": "error" if used and failed == used else "high",
+        "windows": windows,
+    }
+
+
+def api_key_reports(key):
+    usage = management_request(key, "/v8/management/observability/usage/api-keys")
+    sources = []
+    for service, path, field in API_KEY_SOURCES:
+        rows = management_request(key, path).get(field) or []
+        sources += [(service, service, row.get("prefix") or service, row) for row in rows]
+    compatibility = management_request(key, "/v0/management/openai-compatibility").get("openai-compatibility")
+    if not isinstance(compatibility, list):
+        raise RuntimeError(t("CLIProxyAPI OpenAI 호환 provider 목록 형식이 올바르지 않습니다."))
+    for provider in compatibility:
+        name = provider.get("name")
+        # OpenRouter has its own free-tier card.
+        if name != "openrouter":
+            sources += [(name, name, provider.get("prefix") or name, row) for row in provider.get("api-key-entries") or []]
+    reports = []
+    for service, usage_name, label, row in sources:
+        auth_index, api_key = row.get("auth-index"), row.get("api-key")
+        if not all(isinstance(value, str) and value for value in (service, auth_index, api_key)):
+            raise RuntimeError(t("API key 목록 형식이 올바르지 않습니다."))
+        entries = usage.get(usage_name, {})
+        entry = next((value for composite, value in entries.items() if composite.endswith(f"|{api_key}")), None)
+        if not isinstance(entry, dict):
+            raise RuntimeError(t("API key 요청 통계를 찾을 수 없습니다: {v0}", v0=label))
+        reports.append(normalize_api_key_usage(service, label, auth_index, entry))
+    return reports
+
+
 def collect_reports():
     key = management_key()
     state = load_state()
@@ -697,6 +766,7 @@ def collect_reports():
         ("codex", lambda: codex_reports(key, auths)),
         ("claude", lambda: claude_reports(key, auths, state, observed_at)),
         ("openrouter", lambda: openrouter_reports(key, observed_at)),
+        ("api-key", lambda: api_key_reports(key)),
     ):
         try:
             result = collect()
@@ -728,7 +798,7 @@ def reset_cooldowns():
     return t("계정 {v0}개의 프록시 쿨다운을 초기화했습니다.", v0=len(targets))
 
 
-PLAN_LABELS = {"prolite": "Pro Lite", "self_serve_business_prolite": "Business Pro Lite", "team": "Team", "pro": "Pro", "free": "Free", "credits": "Credits", "oauth": "플랜 미확인", "unknown": "플랜 미확인", "max": "Max", "max_5x": "Max 5x", "max_20x": "Max 20x"}
+PLAN_LABELS = {"prolite": "Pro Lite", "self_serve_business_prolite": "Business Pro Lite", "team": "Team", "pro": "Pro", "free": "Free", "credits": "Credits", "api": "API", "oauth": "플랜 미확인", "unknown": "플랜 미확인", "max": "Max", "max_5x": "Max 5x", "max_20x": "Max 20x"}
 
 def display_plan_type(plan_type):
     if not isinstance(plan_type, str) or not plan_type.strip():

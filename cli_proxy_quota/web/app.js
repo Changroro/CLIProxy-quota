@@ -154,6 +154,7 @@ function plan(code) {
       pro: "Pro",
       free: "Free",
       credits: "Credits",
+      api: "API",
       max: "Max",
       max_5x: "Max 5x",
       max_20x: "Max 20x",
@@ -165,7 +166,7 @@ function plan(code) {
 function accountName(report, index) {
   return $("identities").checked
     ? report.alias || report.email || report.name
-    : `${report.provider === "codex" ? "Codex" : report.provider === "claude" ? "Claude" : "OpenRouter"} · ${plan(report.plan_type)} · ${index + 1}`;
+    : `${{ codex: "Codex", claude: "Claude", "api-key": "API Key" }[report.provider] || "OpenRouter"} · ${plan(report.plan_type)} · ${index + 1}`;
 }
 function emptyChart(id, message = "noData") {
   $(id).replaceChildren(text("p", tr(message)));
@@ -380,7 +381,7 @@ function renderAccounts(data) {
       "/assets/" +
       (report.provider === "openrouter"
         ? `openrouter-${document.documentElement.dataset.theme}.svg`
-        : `${report.provider}-symbolic.svg`);
+        : `${report.icon || report.provider}-symbolic.svg`);
     wrap.append(
       icon,
       text("span", accountName(report, data.reports.indexOf(report))),
@@ -426,9 +427,11 @@ function renderAccounts(data) {
         metric.append(
           text(
             "span",
-            window.used_count != null
-              ? `≥${number(window.used_count)} / ${number(window.limit_count)}`
-              : tr("missing"),
+            window.used_count == null
+              ? tr("missing")
+              : window.limit_count == null
+                ? `${number(window.used_count)} · ✕${number(window.failed_count)}`
+                : `≥${number(window.used_count)} / ${number(window.limit_count)}`,
           ),
         );
       stack.append(metric);

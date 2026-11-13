@@ -30,6 +30,7 @@ PROVIDER_LABELS = {
     "codex": "OpenAI / Codex",
     "claude": "Claude",
     "openrouter": "OpenRouter",
+    "api-key": "API Key",
 }
 STATUS_STYLES = {
     "exhausted": ("소진", "danger"),
@@ -576,8 +577,9 @@ class QuotaWindow(Gtk.Window):
         reset_summary = "\n".join(t("{v0} 다음 초기화 {v1}", v0=window['label'], v1=window['reset_label']) for window in display_windows)
         last_reset_summary = "\n".join(t("{v0} 직전 초기화 {v1}", v0=window['label'], v1=window['last_reset_label']) for window in display_windows)
         avatar = Gtk.Button()
-        if provider in ("codex", "claude"):
-            icon_file = Gio.File.new_for_path(str(ASSET_DIR / f"{provider}-symbolic.svg"))
+        icon = report.get("icon", provider)
+        if icon in ("codex", "claude", "api-key"):
+            icon_file = Gio.File.new_for_path(str(ASSET_DIR / f"{icon}-symbolic.svg"))
             avatar.add(Gtk.Image.new_from_gicon(Gio.FileIcon.new(icon_file), Gtk.IconSize.MENU))
         elif provider == "openrouter":
             pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(ASSET_DIR / f"openrouter-{self.effective_theme}.svg"), 16, 16, True)
@@ -725,6 +727,12 @@ class QuotaWindow(Gtk.Window):
             else:
                 used_count = quota_window.get("used_count")
                 limit_count = quota_window.get("limit_count")
+                failed_count = quota_window.get("failed_count")
+                if limit_count is None and isinstance(used_count, int) and isinstance(failed_count, int):
+                    row = Gtk.Label(label=t("{v0}  {v1}회 · 실패 {v2}", v0=label, v1=used_count, v2=failed_count), xalign=0)
+                    row.set_tooltip_text(reset_label)
+                    metrics.pack_start(row, False, False, 0)
+                    continue
                 if not isinstance(used_count, int) or not isinstance(limit_count, int):
                     raise ValueError(t("관측 요청량 정보가 올바르지 않습니다."))
                 metrics.pack_start(

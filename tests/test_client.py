@@ -258,3 +258,34 @@ class CodexControlsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ApiKeyUsageTest(unittest.TestCase):
+    def test_api_keys_become_request_count_cards_matched_by_key(self):
+        module = load_module()
+        recent = [{"time": "a", "success": 2, "failed": 1}, {"time": "b", "success": 0, "failed": 0}]
+        responses = {
+            "/v8/management/observability/usage/api-keys": {
+                "claude": {"|claude-secret": {"recent_requests": recent}},
+                "codex": {"https://api.openai.com/v1|codex-secret": {"recent_requests": recent}},
+                "mistral-api": {"https://api.mistral.ai/v1|mistral-secret": {"recent_requests": [{"success": 0, "failed": 3}]}},
+                "openrouter": {"https://openrouter.ai/api/v1|or-secret": {"recent_requests": recent}},
+            },
+            "/v0/management/claude-api-key": {"claude-api-key": [{"api-key": "claude-secret", "prefix": "claude-api", "auth-index": "c1"}]},
+            "/v0/management/codex-api-key": {"codex-api-key": None},
+            "/v0/management/openai-compatibility": {"openai-compatibility": [
+                {"name": "mistral-api", "prefix": "mistral-api", "api-key-entries": [{"api-key": "mistral-secret", "auth-index": "m1"}]},
+                {"name": "openrouter", "api-key-entries": [{"api-key": "or-secret", "auth-index": "o1"}]},
+            ]},
+        }
+        with patch.object(module, "management_request", side_effect=lambda _key, path: responses[path]):
+            reports = module.api_key_reports("key")
+        self.assertEqual([(r["email"], r["icon"], r["status"]) for r in reports],
+                         [("claude-api · c1", "claude", "high"), ("mistral-api · m1", "api-key", "error")])
+        window = reports[0]["windows"][0]
+        self.assertEqual((window["label"], window["used_count"], window["failed_count"], window["limit_count"]), ("최근 20분", 3, 1, None))
+        self.assertNotIn("secret", repr(reports))
+        module.apply_reset_history(reports, {}, datetime(2026, 11, 13, tzinfo=timezone.utc))
+        responses["/v8/management/observability/usage/api-keys"]["claude"] = {}
+        with patch.object(module, "management_request", side_effect=lambda _key, path: responses[path]), self.assertRaises(RuntimeError):
+            module.api_key_reports("key")

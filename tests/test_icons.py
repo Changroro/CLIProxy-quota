@@ -9,7 +9,7 @@ from gi.repository import GdkPixbuf
 class ServiceIconTest(unittest.TestCase):
     def test_symbolic_logos_have_transparent_space_around_the_glyph(self):
         assets = Path(__file__).resolve().parents[1] / "assets"
-        for provider in ("codex", "claude"):
+        for provider in ("codex", "claude", "api-key"):
             icon = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(assets / f"{provider}-symbolic.svg"), 32, 32, True)
             self.assertTrue(icon.get_has_alpha(), provider)
             pixels = icon.get_pixels()
