@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -619,6 +620,70 @@ def claude_reports(key, auths, state, observed_at):
     return reports, errors
 
 
+def normalize_copilot_usage(auth, usage):
+    snapshot = (usage.get("quota_snapshots") or {}).get("premium_interactions")
+    if not isinstance(snapshot, dict):
+        raise RuntimeError(t("Copilot 프리미엄 요청 한도 정보가 없습니다: {v0}", v0=auth.get("name")))
+    remaining = 100.0 if snapshot.get("unlimited") else snapshot.get("percent_remaining")
+    if not isinstance(remaining, (int, float)):
+        raise RuntimeError(t("Copilot 프리미엄 요청 한도 값이 올바르지 않습니다: {v0}", v0=auth.get("name")))
+    remaining = max(0.0, min(100.0, float(remaining)))
+    reset_at = usage.get("quota_reset_date_utc")
+    if reset_at is not None and parse_time(reset_at) is None:
+        raise RuntimeError(t("Copilot 초기화 시각이 올바르지 않습니다: {v0}", v0=auth.get("name")))
+    windows = [{
+        "id": "premium",
+        "label": "1mo",
+        "used_value": 100.0 - remaining,
+        "remaining_percent": remaining,
+        "reset_at": reset_at,
+        "reset_label": local_label(reset_at),
+    }]
+    auth_index = auth.get("auth_index")
+    name = auth.get("name")
+    email = auth.get("username") or name
+    plan = usage.get("access_type_sku") or usage.get("copilot_plan")
+    if not all(isinstance(value, str) and value for value in (auth_index, name, email, plan)):
+        raise RuntimeError(t("Copilot 인증 계정 정보가 올바르지 않습니다."))
+    return {
+        "account_id": auth_index,
+        "auth_index": auth_index,
+        "email": email,
+        "name": name,
+        "plan_type": plan,
+        "provider": "copilot",
+        "status": report_status(windows),
+        "windows": windows,
+    }
+
+
+def github_request(token, url):
+    request = urllib.request.Request(url, headers={"Authorization": f"token {token}", "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as error:
+        if error.code == 429:
+            raise RateLimitedError(retry_after_seconds(dict(error.headers))) from error
+        raise UpstreamError(error.code) from error
+
+
+def copilot_reports(key, auths):
+    reports = []
+    for auth in (row for row in auths if row.get("provider") == "copilot"):
+        name = auth.get("name")
+        if not isinstance(name, str) or not name:
+            raise RuntimeError(t("Copilot 인증 계정 정보가 올바르지 않습니다."))
+        # api-call's $TOKEN$ is the short-lived Copilot token; GitHub's quota API needs the stored GitHub OAuth token.
+        stored = management_request(key, "/v8/management/credentials/download?" + urllib.parse.urlencode({"name": name}))
+        github_token = stored.get("refresh_token")
+        if not isinstance(github_token, str) or not github_token:
+            raise RuntimeError(t("Copilot 인증 파일에 GitHub 토큰이 없습니다: {v0}", v0=name))
+        usage = github_request(github_token, "https://api.github.com/copilot_internal/user")
+        reports.append(normalize_copilot_usage({**auth, "username": stored.get("username")}, usage))
+    return reports
+
+
 def recent_day_count(entry, observed_at):
     buckets = entry.get("recent_requests")
     if not isinstance(buckets, list) or not buckets:
@@ -765,6 +830,7 @@ def collect_reports():
     for provider, collect in (
         ("codex", lambda: codex_reports(key, auths)),
         ("claude", lambda: claude_reports(key, auths, state, observed_at)),
+        ("copilot", lambda: copilot_reports(key, auths)),
         ("openrouter", lambda: openrouter_reports(key, observed_at)),
         ("api-key", lambda: api_key_reports(key)),
     ):
@@ -798,7 +864,7 @@ def reset_cooldowns():
     return t("계정 {v0}개의 프록시 쿨다운을 초기화했습니다.", v0=len(targets))
 
 
-PLAN_LABELS = {"prolite": "Pro Lite", "self_serve_business_prolite": "Business Pro Lite", "team": "Team", "pro": "Pro", "free": "Free", "credits": "Credits", "api": "API", "oauth": "플랜 미확인", "unknown": "플랜 미확인", "max": "Max", "max_5x": "Max 5x", "max_20x": "Max 20x"}
+PLAN_LABELS = {"prolite": "Pro Lite", "self_serve_business_prolite": "Business Pro Lite", "team": "Team", "pro": "Pro", "free": "Free", "credits": "Credits", "api": "API", "oauth": "플랜 미확인", "unknown": "플랜 미확인", "max": "Max", "max_5x": "Max 5x", "max_20x": "Max 20x", "free_educational_quota": "Student"}
 
 def display_plan_type(plan_type):
     if not isinstance(plan_type, str) or not plan_type.strip():

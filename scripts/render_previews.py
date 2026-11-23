@@ -21,11 +21,12 @@ for index, (provider, plan, remaining) in enumerate([
     ("codex", "team", (42, 24)),
     ("codex", "self_serve_business_prolite", (12, 8)),
     ("claude", "max_20x", (91, 68)),
+    ("copilot", "free_educational_quota", (73,)),
     ("openrouter", "free", (100, 100)),
 ]):
     windows = [{"label": period, "remaining_percent": value, "reset_at": "2026-10-07T01:00:00Z",
                 "reset_label": "10-07 10:00", "last_reset_label": "10-06 10:00"}
-               for period, value in zip(("5h", "7d"), remaining)]
+               for period, value in zip(("1mo",) if provider == "copilot" else ("5h", "7d"), remaining)]
     if provider == "openrouter":
         windows = [{"label": "1d free", "remaining_percent": None, "used_count": 12,
                     "limit_count": 50, "reset_label": "10-07 00:00", "last_reset_label": "10-06 00:00"}]

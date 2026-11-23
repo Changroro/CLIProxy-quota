@@ -77,6 +77,7 @@ Use `--background` to start with the window hidden. Run the command again to ope
 
 - Codex 5h/7d quota, API-reported plan badges and available Reset expiry dates.
 - Claude 5h/7d quota and Pro/Max plan from the OAuth profile, including Max 5x/20x when reported.
+- GitHub Copilot monthly premium-request quota and plan (e.g. Student). The GitHub quota API needs the GitHub token stored in the credential, so it is read through the management API and used only in memory.
 - OpenRouter free-tier status and observed daily request counts. Observed counts are not a complete billing report.
 - Account details and aliases behind the service icon; separate next/last reset information for each period.
 - Per-account collapse, keep-on-top and window dragging.

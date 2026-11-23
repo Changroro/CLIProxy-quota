@@ -158,6 +158,7 @@ function plan(code) {
       max: "Max",
       max_5x: "Max 5x",
       max_20x: "Max 20x",
+      free_educational_quota: "Student",
       unknown: tr("unknown"),
       oauth: tr("unknown"),
     }[code] || code.replace(/^self_serve_|^claude_/g, "").replaceAll("_", " ")
@@ -166,7 +167,7 @@ function plan(code) {
 function accountName(report, index) {
   return $("identities").checked
     ? report.alias || report.email || report.name
-    : `${{ codex: "Codex", claude: "Claude", "api-key": "API Key" }[report.provider] || "OpenRouter"} · ${plan(report.plan_type)} · ${index + 1}`;
+    : `${{ codex: "Codex", claude: "Claude", copilot: "Copilot", "api-key": "API Key" }[report.provider] || "OpenRouter"} · ${plan(report.plan_type)} · ${index + 1}`;
 }
 function emptyChart(id, message = "noData") {
   $(id).replaceChildren(text("p", tr(message)));

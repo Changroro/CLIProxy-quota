@@ -77,6 +77,7 @@ chmod 600 ~/.config/cli-proxy-quota/config.json
 
 - Codex 5h·7d 잔여량, API 플랜 배지, 사용 가능한 Reset 만기일.
 - Claude 5h·7d 잔여량과 OAuth 프로필 기반 Pro·Max 플랜. API가 제공하면 Max 5x·20x 표시.
+- GitHub Copilot 월간 프리미엄 요청 잔여량과 플랜(예: Student). GitHub 한도 API에는 인증 파일 속 GitHub 토큰이 필요해 관리 API로 읽어 메모리에서만 씁니다.
 - OpenRouter 무료 티어와 관측한 일별 요청 수. 관측값은 전체 청구 내역이 아닙니다.
 - 서비스 아이콘을 눌러 메일·별칭·기간별 다음/직전 초기화 확인.
 - 계정별 접기, 항상 위 고정, 창 끌기.

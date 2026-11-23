@@ -100,7 +100,7 @@ class Collector:
             try:
                 reports, errors = client.collect_reports()
                 with self.guard:
-                    order = {"codex": 0, "claude": 1, "openrouter": 2}
+                    order = {"codex": 0, "claude": 1, "copilot": 2, "openrouter": 3, "api-key": 4}
                     reports.sort(key=lambda report: (order[report["provider"]], -report.get("priority", 0)))
                     self.reports, self.errors = reports, errors
                     self.status.update(quota_updated_at=time.time(), quota_error=None)

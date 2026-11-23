@@ -13,6 +13,37 @@ def load_module():
     return client
 
 
+class CopilotUsageTest(unittest.TestCase):
+    def test_student_premium_quota(self):
+        module = load_module()
+        usage = {
+            "access_type_sku": "free_educational_quota",
+            "copilot_plan": "individual",
+            "quota_reset_date_utc": "2026-12-01T00:00:00.000Z",
+            "quota_snapshots": {
+                "chat": {"unlimited": True, "percent_remaining": 100.0},
+                "premium_interactions": {"unlimited": False, "percent_remaining": 37.5, "entitlement": 200, "remaining": 75},
+            },
+        }
+
+        report = module.normalize_copilot_usage(
+            {"auth_index": "a", "name": "copilot-1.json", "username": "octocat"}, usage
+        )
+
+        self.assertEqual(report["provider"], "copilot")
+        self.assertEqual(report["email"], "octocat")
+        self.assertEqual(module.display_plan_type(report["plan_type"]), "Student")
+        self.assertEqual(report["status"], "medium")
+        [window] = report["windows"]
+        self.assertEqual((window["remaining_percent"], window["used_value"]), (37.5, 62.5))
+        self.assertEqual(window["reset_at"], "2026-12-01T00:00:00.000Z")
+
+    def test_missing_premium_quota_fails(self):
+        module = load_module()
+        with self.assertRaises(RuntimeError):
+            module.normalize_copilot_usage({"auth_index": "a", "name": "copilot-1.json"}, {"quota_snapshots": {}})
+
+
 class OpenRouterUsageTest(unittest.TestCase):
     def test_null_prefix_is_valid(self):
         module = load_module()

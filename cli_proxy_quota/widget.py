@@ -29,6 +29,7 @@ REFRESH_SECONDS = 120
 PROVIDER_LABELS = {
     "codex": "OpenAI / Codex",
     "claude": "Claude",
+    "copilot": "GitHub Copilot",
     "openrouter": "OpenRouter",
     "api-key": "API Key",
 }
@@ -578,7 +579,7 @@ class QuotaWindow(Gtk.Window):
         last_reset_summary = "\n".join(t("{v0} 직전 초기화 {v1}", v0=window['label'], v1=window['last_reset_label']) for window in display_windows)
         avatar = Gtk.Button()
         icon = report.get("icon", provider)
-        if icon in ("codex", "claude", "api-key"):
+        if icon in ("codex", "claude", "copilot", "api-key"):
             icon_file = Gio.File.new_for_path(str(ASSET_DIR / f"{icon}-symbolic.svg"))
             avatar.add(Gtk.Image.new_from_gicon(Gio.FileIcon.new(icon_file), Gtk.IconSize.MENU))
         elif provider == "openrouter":

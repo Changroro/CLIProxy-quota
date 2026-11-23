@@ -26,8 +26,10 @@ with tempfile.TemporaryDirectory() as directory:
     worker = Demo()
     rows = []
     now = datetime.now(timezone.utc)
-    for index, (provider, plan) in enumerate([("codex", "prolite"), ("codex", "team"), ("codex", "self_serve_business_prolite"), ("claude", "max_20x"), ("openrouter", "free")]):
+    for index, (provider, plan) in enumerate([("codex", "prolite"), ("codex", "team"), ("codex", "self_serve_business_prolite"), ("claude", "max_20x"), ("copilot", "free_educational_quota"), ("openrouter", "free")]):
         worker.reports.append({"provider": provider, "plan_type": plan, "email": f"demo-{index+1}@example.test", "name": f"demo-{index+1}", "auth_index": f"demo-{index+1}", "windows": [{"label": "5h", "remaining_percent": 87-index*18, "reset_at": (now+timedelta(hours=3)).isoformat()}, {"label": "7d", "remaining_percent": 69-index*13, "reset_at": (now+timedelta(days=4)).isoformat()}]})
+        if provider == "copilot":
+            worker.reports[-1]["windows"] = [{"label": "1mo", "remaining_percent": 73, "reset_at": (now+timedelta(days=8)).isoformat()}]
         if provider == "openrouter":
             worker.reports[-1]["windows"] = [{"label": "1d free", "remaining_percent": None, "used_count": 12, "limit_count": 50}]
         for day in range(12):
