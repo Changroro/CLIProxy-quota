@@ -854,7 +854,8 @@ def collect_reports():
 
 def reset_cooldowns():
     key = management_key()
-    targets = [auth for auth in active_auths(key) if auth.get("unavailable") is True or auth.get("status") == "error"]
+    # 계정은 정상이고 모델 하나만 막힌 경우도 cooldowns에만 나타난다.
+    targets = [auth for auth in active_auths(key) if auth.get("cooldowns") or auth.get("unavailable") is True or auth.get("status") == "error"]
     if not targets:
         return t("쿨다운 상태인 계정이 없습니다.")
     for auth in targets:

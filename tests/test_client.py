@@ -320,3 +320,20 @@ class ApiKeyUsageTest(unittest.TestCase):
         responses["/v8/management/observability/usage/api-keys"]["claude"] = {}
         with patch.object(module, "management_request", side_effect=lambda _key, path: responses[path]), self.assertRaises(RuntimeError):
             module.api_key_reports("key")
+
+
+class ResetCooldownsTest(unittest.TestCase):
+    def test_model_cooldown_on_active_account_is_reset(self):
+        module = load_module()
+        auths = [
+            {"auth_index": "a", "status": "active", "unavailable": False,
+             "cooldowns": [{"scope": "model", "model": "gpt-6-luna"}]},
+            {"auth_index": "b", "status": "active", "unavailable": False, "cooldowns": []},
+        ]
+        with patch.object(module, "management_key", return_value="key"), patch.object(
+            module, "active_auths", return_value=auths
+        ), patch.object(module, "management_request", return_value={"status": "ok"}) as request:
+            module.reset_cooldowns()
+        self.assertEqual(request.call_args_list, [
+            call("key", "/v8/management/routing/cooldown/reset", {"auth_index": "a"}),
+        ])
